@@ -1,113 +1,295 @@
-import Image from "next/image";
+"use client"
+import Product from "@/components/Products/Product";
+import ProductSkeleton from "@/components/Products/ProductSkeleton";
+
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { COLOR_FILTERS, SORT_OPTIONS, SUBCATEGORIES,SIZE_FILTERS, PRICE_FILTERS } from "@/constants";
+
+import type { Product as TProduct } from '@/db'
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { QueryResult } from "@upstash/vector";
+import axios from "axios";
+import { ChevronDown, Filter } from "lucide-react";
+import debounce from 'lodash.debounce'
+import { useCallback, useState } from "react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { AVAILABLE_SIZES, ProductState } from "@/lib/validations";
+import { Slider } from "@/components/ui/slider";
+import EmptyState from "@/components/Products/EmptyState";
 
 export default function Home() {
+  const DEFAULT_CUSTOM_PRICE = [0, 100] as [number, number]
+  const [filter, setFilter] = useState<ProductState>({
+    sort : 'none',
+    color :['beige', 'blue', 'green', 'purple', 'white'],
+    size: ['L', 'M', 'S'],
+    price: { isCustom: false, range: DEFAULT_CUSTOM_PRICE  },
+   
+  })
+ console.log(filter)
+  const getProducts = async () => {
+    const { data } = await axios.post<QueryResult<TProduct>[]>('http://localhost:3000/api/products',
+    {
+      filter : {
+        sort: filter.sort,
+        color :filter.color,
+        size : filter.size,
+        price : filter.price.range
+       
+        
+      }
+    }
+
+    )
+    return data;
+  }
+  const {data : products, isLoading, refetch} = useQuery({
+    queryKey : ['products'],
+    queryFn : getProducts
+   
+  })
+
+  const onSubmit = () => refetch()
+  const debouncedSubmit = debounce(onSubmit, 400)
+  const _debouncedSubmit = useCallback(debouncedSubmit, [])
+ const applyFilter = ({category, value} : 
+  {category : keyof Omit<typeof filter, "price" | "sort"> 
+  value : string
+  }) => {
+const isFilteredArray = filter[category].includes(value as never)
+if (isFilteredArray) {
+  setFilter((prev) => ({
+    ...prev,
+    [category]: prev[category].filter((v) => v !== value),
+  }))
+} else {
+  setFilter((prev) => ({
+    ...prev,
+    [category]: [...prev[category], value],
+  }))
+}
+_debouncedSubmit()
+ }
+ const minPrice = Math.min(filter.price.range[0], filter.price.range[1])
+  const maxPrice = Math.max(filter.price.range[0], filter.price.range[1])
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+   <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="flex items-baseline justify-between border-b border-gray-200 pb-6 pt-24">
+      
+<h1 className="text-4xl font-bold tracking-tight ">
+  High-quality cotton selection
+</h1>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-full sm:before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full sm:after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+<div className="flex items-center">
+<DropdownMenu>
+  <DropdownMenuTrigger className="group inline-flex justify-center text-sm font-medium text-gray-700 hover:text-gray-900">Sort
+  <ChevronDown className="-mr-5 ml-1 h-5 w-5 flex-shrink-0 text-gray-400 group-hover:text-gray-500"/>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent className="align-end">
+   {SORT_OPTIONS.map(({name, value}) => (
+   <button className={cn('text-left w-full block px-4 py-2 text-sm',{
+    'text-gray-900 bg-gray-100': value === filter.sort,
+    'text-gray-500': value !== filter.sort,
+   })} key={name} onClick={() => {
+    setFilter((prev) => ({
+      ...prev,
+      sort : value
+    }))
+    _debouncedSubmit()
+   }}>{name}</button>
+   ))}
+  </DropdownMenuContent>
+</DropdownMenu>
+<button className="-m-2-m-2 ml-4 p-2 text-gray-400 hover:text-gray-500 sm:ml-6 lg:hidden">
+<Filter className="w-5 h-5" />
+</button>
+</div>
+    </div>
 
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
+    <section className="pb-24 pt-6 ">
+<div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-4 ">
+  <div className="hidden lg:block ">
+<ul className="space-y-4 border-b border-gray-200 pb-6 text-sm font-medium text-gray-900">
+{SUBCATEGORIES.map((category) => (
+<li key={category.name}>
+ <button disabled={!category.selected} className="disabled:cursor-not-allowed disabled:opacity-60">
+  {category.name}
+ </button>
+  </li>
+))}
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
 
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
+</ul>
+<Accordion type="multiple" className="animate-none">
+  <AccordionItem value="color">
+<AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+<span className="font-medium text-gray-900">color</span>
+</AccordionTrigger>
+<AccordionContent className="pt-6 animate-none">
+<ul className="space-y-4">
+  {COLOR_FILTERS.options.map((color, colorIndex) => (
+<li key={color.value} className="flex items-center">
+ <input type="checkbox" id={`color-${colorIndex}`}  checked={filter.color.includes(color.value)} onChange={() => {
+ applyFilter({
+  category : 'color',
+  value : color.value
+ })
+ }}className="h-4 w-4 rounded border-gray-300 text-indigi-600 focus:ring-indigo-500"/>
+ <label htmlFor={`color-${colorIndex}`} className="ml-3 text-sm text-gray-600">
+  {color.label}
+  </label>
+  </li>
+  ))}
+</ul>
 
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50 text-balance`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+</AccordionContent>
+  </AccordionItem>
+  
+
+  <AccordionItem value="size">
+<AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+<span className="font-medium text-gray-900">size</span>
+</AccordionTrigger>
+<AccordionContent className="pt-6 animate-none">
+<ul className="space-y-4">
+  {SIZE_FILTERS.options.map((size, sizeINDEX) => (
+<li key={size.value} className="flex items-center">
+ <input type="checkbox" id={`size-${sizeINDEX}`}  checked={filter.size.includes(size.value)} onChange={() => {
+ applyFilter({
+  category : 'size',
+  value : size.value
+ })
+ }}className="h-4 w-4 rounded border-gray-300 text-indigi-600 focus:ring-indigo-500"/>
+ <label htmlFor={`size-${sizeINDEX}`} className="ml-3 text-sm text-gray-600">
+  {size.label}
+  </label>
+  </li>
+  ))}
+</ul>
+
+</AccordionContent>
+  </AccordionItem>
+
+  <AccordionItem value="price">
+<AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+<span className="font-medium text-gray-900">Price</span>
+</AccordionTrigger>
+<AccordionContent className="pt-6 animate-none">
+<ul className="space-y-4">
+  {PRICE_FILTERS.options.map((option, optionINDEX) => (
+<li key={option.label} className="flex items-center">
+ <input type="radio" id={`option-${optionINDEX}`}   checked={
+                            !filter.price.isCustom &&
+                            filter.price.range[0] === option.value[0] &&
+                            filter.price.range[1] === option.value[1]
+                          } onClick={() => {
+ setFilter((prev => ({
+  ...prev, price : {isCustom : false, range : [...option.value]}
+ })))
+ _debouncedSubmit()
+ }}
+ className="h-4 w-4 rounded border-gray-300 text-indigi-600 focus:ring-indigo-500"/>
+ <label htmlFor={`option-${optionINDEX}`} className="ml-3 text-sm text-gray-600">
+  {option.label}
+  </label>
+  </li>
+  ))}
+
+  <li className="flex justify-center flex-col gap-2">
+  <div>
+                        <input
+                          type='radio'
+                          id={`price-${PRICE_FILTERS.options.length}`}
+                          onChange={() => {
+        setFilter((prev) => ({
+                              ...prev,
+                              price: {
+          isCustom: true,
+                                range: [0, 100],
+                              },
+                            }))
+                            _debouncedSubmit()
+                          
+                          }}
+                          checked={filter.price.isCustom}
+                          className='h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'
+                        />
+                        <label
+                          htmlFor={`price-${PRICE_FILTERS.options.length}`}
+                          className='ml-3 text-sm text-gray-600'>
+                          Custom
+                        </label>
+                      </div>
+<div className="flex justify-between ">
+<p className="">price</p>
+<div>
+{filter.price.isCustom
+                            ? minPrice.toFixed(0)
+                            : filter.price.range[0].toFixed(0)}{' '}
+                          € -{' '}
+                          {filter.price.isCustom
+                            ? maxPrice.toFixed(0)
+                            : filter.price.range[1].toFixed(0)}{' '}
+                          €
+</div>
+</div>
+<Slider className={cn({
+  'opacity : 50 ' : !filter.price.isCustom 
+})} disabled={!filter.price.isCustom} 
+onValueChange={(range) => {
+  const [newMin, newMax] = range
+
+  setFilter((prev) => ({
+    ...prev,
+    price: {
+      isCustom: true,
+      range: [newMin, newMax],
+    },
+  }))
+
+  _debouncedSubmit()
+}} value={
+  filter.price.isCustom
+    ? filter.price.range
+    : DEFAULT_CUSTOM_PRICE
+} 
+
+min={DEFAULT_CUSTOM_PRICE[0]}
+                        defaultValue={DEFAULT_CUSTOM_PRICE}
+                        max={DEFAULT_CUSTOM_PRICE[1]}
+                        step={5}/>
+  </li>
+</ul>
+
+</AccordionContent>
+  </AccordionItem>
+</Accordion>
+  </div>
+<ul className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+  
+{
+  isLoading ? (
+    new Array(12)
+      .fill(null)
+      .map((_, i) => <ProductSkeleton key={i} />)
+  ) : products && products.length === 0 ? (
+    <EmptyState />
+  ) : 
+    products?.map((product) => (
+      <Product product={product.metadata!} />
+    ))
+  
+}
+
+</ul>
+</div>
+    </section>
+   </main>
   );
 }
